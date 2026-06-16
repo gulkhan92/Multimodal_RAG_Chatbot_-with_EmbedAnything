@@ -1,0 +1,35 @@
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from dotenv import load_dotenv
+
+
+@dataclass(frozen=True)
+class Settings:
+    gemini_api_key: str
+    quadrant_url: str
+    quadrant_api_key: str
+    embedanything_model: str
+
+    @staticmethod
+    def from_env() -> "Settings":
+        load_dotenv()
+
+        gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
+        quadrant_url = os.getenv("QUADRANT_URL", "").strip()
+        quadrant_api_key = os.getenv("QUADRANT_API_KEY", "").strip()
+        embedanything_model = os.getenv("EMBEDANYTHING_MODEL", "").strip()
+
+        if not gemini_api_key:
+            raise RuntimeError("Missing GEMINI_API_KEY in environment/.env")
+        if not quadrant_url:
+            raise RuntimeError("Missing QUADRANT_URL in environment/.env")
+
+        # embed model can be empty depending on EmbedAnything defaults
+        return Settings(
+            gemini_api_key=gemini_api_key,
+            quadrant_url=quadrant_url,
+            quadrant_api_key=quadrant_api_key,
+            embedanything_model=embedanything_model,
+        )

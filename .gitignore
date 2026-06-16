@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.venv/
+venv/
+ENV/
+env/
+
+# Virtual envs / tooling
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.ruff_cache/
+
+# Env files / secrets
+.env
+.env.*
+*.env
+.envrc
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Project data + local TODOs (requested)
+data/
+TODO.md
+
+# Build / dist
+build/
+dist/
+*.wheel
+*.tar.gz
+
+# Notebook checkpoints
+.ipynb_checkpoints/
