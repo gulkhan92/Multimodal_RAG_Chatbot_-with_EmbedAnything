@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
+from PIL import Image
 from rag_multimodal.chat.__init__ import __all__ as _unused  # keeps package import happy
 from rag_multimodal.ingest.embed_anything import EmbedAnythingClient
 from rag_multimodal.ingest.quadrant_store import QuadrantStore
@@ -61,8 +63,20 @@ def main() -> None:
         from rag_multimodal.rag.prompt import build_gemini_prompt
         prompt = build_gemini_prompt(question=q, chunks=all_chunks)
         
-        # Use the generate method defined in GeminiClient
-        gemini_resp = gemini.generate(prompt=prompt)
+        # Build multimodal contents list
+        contents = [prompt]
+        # Track unique images to avoid passing the same image multiple times
+        seen_images = set()
+        for ch in all_chunks:
+            if ch.metadata.get("modality") == "png":
+                img_path = ch.metadata.get("source_path")
+                if img_path and img_path not in seen_images:
+                    p = Path(img_path)
+                    if p.exists():
+                        contents.append(Image.open(p))
+                        seen_images.add(img_path)
+
+        gemini_resp = gemini.generate(contents=contents)
         answer_text = gemini_resp.text
 
         print("\nAnswer:\n" + answer_text)

@@ -36,14 +36,16 @@ def build_gemini_prompt(*, question: str, chunks: List[RetrievedChunk]) -> str:
         text = ch.text or meta.get("text") or ""
         text = (text or "").strip()
         if not text:
-            # For image chunks we may not have text; still include a placeholder.
-            text = f"(no extracted text available for this chunk)"
+            if modality == "png":
+                text = f"(Visual context provided via attached image: {source})"
+            else:
+                text = f"(no extracted text available for this chunk)"
 
         context_parts.append(f"{header}\n{indent(text, 2)}")
 
     context = "\n\n".join(context_parts)
     return (
-        "You are a helpful assistant. Answer the user's question using ONLY the provided context. "
+        "You are a helpful assistant. Answer the user's question using the provided context (text and images). "
         "If the context is insufficient, say you don't know.\n\n"
         "Context:\n"
         f"{context}\n\n"
