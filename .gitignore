@@ -45,3 +45,4 @@ dist/
 
 # Notebook checkpoints
 .ipynb_checkpoints/
+.rag_ingest_manifest.json
