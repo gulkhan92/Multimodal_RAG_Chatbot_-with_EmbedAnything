@@ -8,6 +8,7 @@ venv/
 .venv311/
 ENV/
 env/
+data/
 qdrant_data/
 
 # Virtual envs / tooling
