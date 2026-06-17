@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 class Settings:
     gemini_api_key: str
     quadrant_url: str
+    quadrant_path: str
     quadrant_api_key: str
     embedanything_model: str
 
@@ -17,19 +18,24 @@ class Settings:
         load_dotenv()
 
         gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
+
         quadrant_url = os.getenv("QUADRANT_URL", "").strip()
+        quadrant_path = os.getenv("QUADRANT_PATH", "").strip()
         quadrant_api_key = os.getenv("QUADRANT_API_KEY", "").strip()
+
         embedanything_model = os.getenv("EMBEDANYTHING_MODEL", "").strip()
 
         if not gemini_api_key:
             raise RuntimeError("Missing GEMINI_API_KEY in environment/.env")
-        if not quadrant_url:
-            raise RuntimeError("Missing QUADRANT_URL in environment/.env")
+
+        if not quadrant_url and not quadrant_path:
+            raise RuntimeError("Missing QUADRANT_URL or QUADRANT_PATH in environment/.env")
 
         # embed model can be empty depending on EmbedAnything defaults
         return Settings(
             gemini_api_key=gemini_api_key,
             quadrant_url=quadrant_url,
+            quadrant_path=quadrant_path,
             quadrant_api_key=quadrant_api_key,
             embedanything_model=embedanything_model,
         )

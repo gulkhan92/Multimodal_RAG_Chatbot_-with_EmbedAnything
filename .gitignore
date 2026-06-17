@@ -27,9 +27,12 @@ htmlcov/
 .vscode/
 .idea/
 
-# Project data + local TODOs (requested)
-data/
-TODO.md
+# Project data (do not ignore the corpus by default)
+# data/
+
+# Local ingest manifests (if you create/track them locally)
+.rag_ingest_manifest.json
+.rag_*manifest*.json
 
 # Build / dist
 build/

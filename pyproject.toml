@@ -14,11 +14,11 @@ pypdf = "^4.2.0"
 Pillow = "^10.4.0"
 requests = "^2.32.3"
 
-# The actual package names/import paths for EmbedAnything and Quadrant
-# may differ; adjust these if needed after first run.
-embedanything = "*"
+# The actual package names/import paths for EmbedAnything and Quadrant may differ;
+# use the pip package name for Poetry's dependency resolution.
+embed-anything = "0.6.6"
 google-generativeai = "^0.7.2"
-quadrant = "*"
+qdrant-client = "*"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.6.4"

@@ -17,7 +17,13 @@ def main() -> None:
     args = parser.parse_args()
 
     settings = Settings.from_env()
-    store = QuadrantStore(url=settings.quadrant_url, api_key=settings.quadrant_api_key)
+    store_kwargs = {"api_key": settings.quadrant_api_key}
+    if settings.quadrant_url:
+        store_kwargs["url"] = settings.quadrant_url
+    if settings.quadrant_path:
+        store_kwargs["path"] = settings.quadrant_path
+
+    store = QuadrantStore(**store_kwargs)
 
     embed_client = EmbedAnythingClient(model_name=settings.embedanything_model)
     gemini = GeminiClient(api_key=settings.gemini_api_key)

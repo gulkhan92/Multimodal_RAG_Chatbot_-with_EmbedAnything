@@ -1,0 +1,13 @@
+pypdf==4.2.0
+Pillow==10.4.0
+python-dotenv==1.0.1
+tqdm==4.66.4
+requests==2.32.3
+
+google-generativeai==0.7.2
+
+# EmbedAnything (pip package name + pinned version)
+# Pinned to avoid build issues; let embed-anything resolve its own onnxruntime dependency.
+embed-anything==0.6.6
+
+qdrant-client
