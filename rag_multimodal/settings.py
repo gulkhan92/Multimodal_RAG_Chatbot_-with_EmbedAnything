@@ -13,12 +13,16 @@ class Settings:
     quadrant_api_key: str
     embedanything_text_model: str
     embedanything_image_model: str
+    secret_key: str
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
 
     @staticmethod
     def from_env() -> "Settings":
         load_dotenv()
 
         gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
+        secret_key = os.getenv("SECRET_KEY", "default_secret_for_dev_only").strip()
 
         quadrant_url = os.getenv("QUADRANT_URL", "").strip()
         quadrant_path = os.getenv("QUADRANT_PATH", "").strip()
@@ -41,4 +45,5 @@ class Settings:
             quadrant_api_key=quadrant_api_key,
             embedanything_text_model=embedanything_text_model,
             embedanything_image_model=embedanything_image_model,
+            secret_key=secret_key
         )
