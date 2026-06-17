@@ -25,7 +25,8 @@ def main() -> None:
 
     store = QuadrantStore(**store_kwargs)
 
-    embed_client = EmbedAnythingClient(model_name=settings.embedanything_model)
+    text_client = EmbedAnythingClient(model_name=settings.embedanything_text_model)
+    image_client = EmbedAnythingClient(model_name=settings.embedanything_image_model)
     gemini = GeminiClient(api_key=settings.gemini_api_key)
 
     print("Multimodal RAG CLI. Type 'exit' to quit.")
@@ -41,18 +42,36 @@ def main() -> None:
             print("Bye.")
             return
 
-        resp = answer_question(
-            question=q,
-            settings=settings,
-            embed_client=embed_client,
-            store=store,
-            gemini=gemini,
-            top_k=args.top_k,
-        )
+        # Perform multimodal retrieval across separate collections
+        # 1. Search PDFs (Text space)
+        text_query_emb = text_client.embed_text([q])[0]
+        store.collection = "data_pdf"
+        text_chunks = store.similarity_search(embedding=text_query_emb, top_k=args.top_k)
 
-        print("\nAnswer:\n" + resp.answer)
-        if resp.citations:
-            print("\nCitations: " + ", ".join(f"[{i}]" for i in resp.citations))
+        # 2. Search Images (CLIP space)
+        image_query_emb = image_client.embed_text([q])[0]
+        store.collection = "data_png"
+        image_chunks = store.similarity_search(embedding=image_query_emb, top_k=args.top_k)
+
+        # Combine results
+        all_chunks = sorted(text_chunks + image_chunks, key=lambda x: x.score, reverse=True)[:args.top_k]
+
+        # Note: You may need to update your `answer_question` signature in answer.py 
+        # to accept the pre-retrieved chunks directly.
+        from rag_multimodal.rag.prompt import build_gemini_prompt
+        prompt = build_gemini_prompt(question=q, chunks=all_chunks)
+        
+        # Use the generate method defined in GeminiClient
+        gemini_resp = gemini.generate(prompt=prompt)
+        answer_text = gemini_resp.text
+
+        print("\nAnswer:\n" + answer_text)
+        
+        # Optional: Parse and display citations
+        from rag_multimodal.rag.answer import parse_citations
+        citations = parse_citations(answer_text)
+        if citations:
+            print("\nCitations: " + ", ".join(f"[{i}]" for i in citations))
 
 
 if __name__ == "__main__":

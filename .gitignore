@@ -8,6 +8,7 @@ venv/
 .venv311/
 ENV/
 env/
+qdrant_data/
 
 # Virtual envs / tooling
 .mypy_cache/

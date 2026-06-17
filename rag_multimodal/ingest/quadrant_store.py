@@ -52,10 +52,12 @@ class QuadrantStore:
                 raise RuntimeError("QuadrantStore requires either `url` or `path`.")
             self._client = QdrantClient(url=url, api_key=api_key)
 
-    def _ensure_collection(self, *, vector_size: int) -> None:
+    def _collection_exists(self) -> bool:
         collections = self._client.get_collections().collections
-        exists = any(c.name == self.collection for c in collections)
-        if exists:
+        return any(c.name == self.collection for c in collections)
+
+    def _ensure_collection(self, *, vector_size: int) -> None:
+        if self._collection_exists():
             return
 
         self._client.create_collection(
@@ -108,6 +110,8 @@ class QuadrantStore:
         """
         if not filter_metadata:
             return
+        if not self._collection_exists():
+            return
         flt = self._build_filter(filter_metadata=filter_metadata)
         self._client.delete(collection_name=self.collection, points_selector=flt)
 
@@ -116,6 +120,8 @@ class QuadrantStore:
         Return how many points match the payload filter.
         """
         if not filter_metadata:
+            return 0
+        if not self._collection_exists():
             return 0
         flt = self._build_filter(filter_metadata=filter_metadata)
         res = self._client.count(collection_name=self.collection, count_filter=flt)
@@ -132,6 +138,9 @@ class QuadrantStore:
         Search Qdrant for similar items using vector cosine similarity.
         """
         if not embedding:
+            return []
+
+        if not self._collection_exists():
             return []
 
         query_filter: Optional[Filter] = None

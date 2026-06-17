@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -13,8 +14,7 @@ from rag_multimodal.settings import Settings
 
 
 def _default_collection_for_modality(modality: str) -> str:
-    # Keep a single collection for MVP; you can evolve to per-modality later.
-    return "data_multimodal"
+    return f"data_{modality}"
 
 
 def ingest_pdfs(*, data_dir: str | Path, settings: Settings, store: QuadrantStore) -> None:
@@ -23,7 +23,8 @@ def ingest_pdfs(*, data_dir: str | Path, settings: Settings, store: QuadrantStor
         print("No PDF files found.")
         return
 
-    embed_client = EmbedAnythingClient(model_name=settings.embedanything_model)
+    store.collection = _default_collection_for_modality("pdf")
+    embed_client = EmbedAnythingClient(model_name=settings.embedanything_text_model)
 
     for f in files:
         print(f"Ingesting PDF: {f.path}")
@@ -44,7 +45,8 @@ def ingest_pdfs(*, data_dir: str | Path, settings: Settings, store: QuadrantStor
             embeddings = embed_client.embed_text(chunk_texts)  # type: ignore[attr-defined]
 
             for c, emb in zip(chunks, embeddings):
-                chunk_id = f"{f.path.as_posix()}::p{page.page_index}::c{c.chunk_index}"
+                raw_id = f"{f.path.as_posix()}::p{page.page_index}::c{c.chunk_index}"
+                chunk_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, raw_id))
                 all_ids.append(chunk_id)
                 all_embeddings.append(emb)
                 all_metadatas.append(
@@ -69,7 +71,8 @@ def ingest_pngs(*, data_dir: str | Path, settings: Settings, store: QuadrantStor
         print("No PNG files found.")
         return
 
-    embed_client = EmbedAnythingClient(model_name=settings.embedanything_model)
+    store.collection = _default_collection_for_modality("png")
+    embed_client = EmbedAnythingClient(model_name=settings.embedanything_image_model)
 
     for f in files:
         print(f"Ingesting PNG: {f.path}")
@@ -77,7 +80,8 @@ def ingest_pngs(*, data_dir: str | Path, settings: Settings, store: QuadrantStor
         # EmbedAnything image embedding placeholder.
         embedding = embed_client.embed_image(str(f.path))  # type: ignore[attr-defined]
 
-        vec_id = f"{f.path.as_posix()}::img0"
+        raw_id = f"{f.path.as_posix()}::img0"
+        vec_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, raw_id))
         store.upsert_embeddings(
             ids=[vec_id],
             embeddings=[embedding],

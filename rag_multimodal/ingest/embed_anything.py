@@ -28,13 +28,25 @@ class EmbedAnythingClient:
     """
 
     def __init__(self, model_name: str = ""):
-        self.model_name = model_name
-
-        # Instantiate an embedder; constructor signature may vary by version.
+        # Map string model name to ea.WhichModel enum
         try:
-            self.embedder = ea.EmbeddingModel(model_name=model_name)  # type: ignore[call-arg]
-        except TypeError:
-            self.embedder = ea.EmbeddingModel(model_name)  # type: ignore[call-arg]
+            # This converts a string like "Bert" or "Clip" to ea.WhichModel.Bert or ea.WhichModel.Clip
+            model_enum = getattr(ea.WhichModel, model_name)
+        except AttributeError:
+            raise ValueError(f"Model '{model_name}' is not a valid ea.WhichModel member. "
+                             "Please check your .env and use values like 'Bert' or 'Clip'.")
+
+        # from_pretrained_hf requires both a model_id (string) and the which_model enum.
+        # We map common architecture names to their default Hugging Face model IDs.
+        model_id_map = {
+            "Bert": "sentence-transformers/all-MiniLM-L6-v2",
+            "Clip": "openai/clip-vit-base-patch32",
+        }
+        
+        model_id = model_id_map.get(model_name, "sentence-transformers/all-MiniLM-L6-v2")
+
+        # The first argument 'model' expects a WhichModel enum, the second 'model_id' a string.
+        self.embedder = ea.EmbeddingModel.from_pretrained_hf(model_enum, model_id)
 
         self.text_config: Optional[ea.TextEmbedConfig] = None
 
@@ -42,37 +54,22 @@ class EmbedAnythingClient:
         if not texts:
             return []
 
-        vectors: List[List[float]] = []
-        for t in texts:
-            vec = ea.embed_query(t, self.embedder, config=self.text_config)
-            vectors.append(_to_list_of_floats(np.asarray(vec)))
-        return vectors
+        # embed_query expects a list of strings (Vec<String> in Rust).
+        # This returns a list of embedding objects.
+        raw_vecs = ea.embed_query(texts, self.embedder, config=self.text_config)
+        # Each 'v' is an Embedding object. We access the .embedding field which is the actual vector.
+        return [_to_list_of_floats(np.asarray(v.embedding)) for v in raw_vecs]
 
     def embed_image(self, image_path: str) -> List[float]:
         """
-        MVP embedding approach:
-        - call `embed_image_directory()` on the parent directory
-        - require the parent directory to contain exactly one image file
-          so we can select the correct embedding deterministically
+        Embed a single image file.
         """
         p = Path(image_path)
         if not p.exists() or not p.is_file():
             raise FileNotFoundError(str(p))
 
-        parent = p.parent
-        images = [x for x in parent.iterdir() if x.is_file() and x.suffix.lower() in {".png", ".jpg", ".jpeg"}]
-        if len(images) != 1:
-            raise RuntimeError(
-                "EmbedAnythingClient.embed_image MVP expects the image parent directory to contain exactly one image. "
-                f"Parent dir has {len(images)} images: {[x.name for x in images]}"
-            )
-
-        vecs = ea.embed_image_directory(
-            str(parent),
-            self.embedder,
-            config=None,
-            adapter=None,
-        )
-
-        # embed_image_directory returns embeddings in file order; since there's 1 file, take the first.
-        return _to_list_of_floats(np.asarray(vecs[0]))
+        # embed_image typically expects a list of paths (Vec<String>) and returns a list of embeddings.
+        # This matches the pattern seen in embed_query where a list was required.
+        # embed_file returns a list of results. We index [0] to get the result for our single file.
+        res = ea.embed_file(str(p), self.embedder)
+        return _to_list_of_floats(np.asarray(res[0].embedding))

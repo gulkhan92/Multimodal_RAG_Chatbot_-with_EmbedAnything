@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
@@ -61,6 +62,7 @@ def ingest_changed_pdfs(
     if not files:
         print("No PDF files found.")
         return manifest
+    store.collection = "data_pdf"
 
     for f in files:
         key = _file_key(data_dir, f.path)
@@ -86,7 +88,8 @@ def ingest_changed_pdfs(
             embeddings = embed_client.embed_text(chunk_texts)
 
             for c, emb in zip(chunks, embeddings):
-                chunk_id = f"{f.path.as_posix()}::p{page.page_index}::c{c.chunk_index}"
+                raw_id = f"{f.path.as_posix()}::p{page.page_index}::c{c.chunk_index}"
+                chunk_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, raw_id))
                 for_upsert_ids.append(chunk_id)
                 for_upsert_embeddings.append(emb)
                 for_upsert_metadatas.append(
@@ -108,7 +111,6 @@ def ingest_changed_pdfs(
                 filter_metadata={
                     "source_path": str(f.path),
                     "modality": "pdf",
-                    "file_sha256": sha,
                 }
             )
 
@@ -135,6 +137,7 @@ def ingest_changed_pngs(
     if not files:
         print("No PNG files found.")
         return manifest
+    store.collection = "data_png"
 
     for f in files:
         key = _file_key(data_dir, f.path)
@@ -151,12 +154,12 @@ def ingest_changed_pngs(
             filter_metadata={
                 "source_path": str(f.path),
                 "modality": "png",
-                "file_sha256": sha,
             }
         )
 
         embedding = embed_client.embed_image(str(f.path))
-        vec_id = f"{f.path.as_posix()}::img0"
+        raw_id = f"{f.path.as_posix()}::img0"
+        vec_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, raw_id))
 
         store.upsert_embeddings(
             ids=[vec_id],
@@ -199,7 +202,7 @@ def main() -> None:
     settings = Settings.from_env()
     data_dir = Path(args.data_dir)
 
-    store_kwargs: Dict[str, Any] = {"api_key": settings.quadrant_api_key, "collection": args.collection or "data_multimodal"}
+    store_kwargs: Dict[str, Any] = {"api_key": settings.quadrant_api_key}
     if settings.quadrant_url:
         store_kwargs["url"] = settings.quadrant_url
     if settings.quadrant_path:
@@ -210,20 +213,21 @@ def main() -> None:
     manifest_path = Path(args.manifest)
     manifest = _load_manifest(manifest_path)
 
-    embed_client = EmbedAnythingClient(model_name=settings.embedanything_model)
+    text_client = EmbedAnythingClient(model_name=settings.embedanything_text_model)
+    image_client = EmbedAnythingClient(model_name=settings.embedanything_image_model)
 
     manifest = ingest_changed_pdfs(
         data_dir=data_dir,
         settings=settings,
         store=store,
-        embed_client=embed_client,
+        embed_client=text_client,
         manifest=manifest,
     )
     manifest = ingest_changed_pngs(
         data_dir=data_dir,
         settings=settings,
         store=store,
-        embed_client=embed_client,
+        embed_client=image_client,
         manifest=manifest,
     )
 

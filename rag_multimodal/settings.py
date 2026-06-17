@@ -11,7 +11,8 @@ class Settings:
     quadrant_url: str
     quadrant_path: str
     quadrant_api_key: str
-    embedanything_model: str
+    embedanything_text_model: str
+    embedanything_image_model: str
 
     @staticmethod
     def from_env() -> "Settings":
@@ -23,7 +24,8 @@ class Settings:
         quadrant_path = os.getenv("QUADRANT_PATH", "").strip()
         quadrant_api_key = os.getenv("QUADRANT_API_KEY", "").strip()
 
-        embedanything_model = os.getenv("EMBEDANYTHING_MODEL", "").strip()
+        embedanything_text_model = os.getenv("EMBEDANYTHING_TEXT_MODEL", "").strip()
+        embedanything_image_model = os.getenv("EMBEDANYTHING_IMAGE_MODEL", "").strip()
 
         if not gemini_api_key:
             raise RuntimeError("Missing GEMINI_API_KEY in environment/.env")
@@ -37,5 +39,6 @@ class Settings:
             quadrant_url=quadrant_url,
             quadrant_path=quadrant_path,
             quadrant_api_key=quadrant_api_key,
-            embedanything_model=embedanything_model,
+            embedanything_text_model=embedanything_text_model,
+            embedanything_image_model=embedanything_image_model,
         )
