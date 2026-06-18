@@ -47,18 +47,22 @@ graph TD
     end
 ```
 
-+## 🏛 Architecture Discussion +The system architecture is built on the principle of Modality Isolation. Instead of forcing text and images into a single, potentially noisy shared latent space, we maintain dedicated pipelines for each data type. This ensures that the linguistic precision of BERT and the visual-semantic understanding of CLIP are preserved at their native resolutions. The FastAPI Orchestrator acts as a bridge, managing parallel retrieval across multiple Qdrant collections and synthesizing the results before hand-off to the LLM. + +### Multimodal Vector Strategy & Similarity Search +The current logic effectively manages disparate vector dimensions to optimize retrieval accuracy: + +1. Textual Dimensions (BERT):
+# Architecture Discussion:
+The system architecture is built on the principle of Modality Isolation. Instead of forcing text and images into a single, potentially noisy shared latent space, we maintain dedicated pipelines for each data type. This ensures that the linguistic precision of BERT and the visual-semantic understanding of CLIP are preserved at their native resolutions. The FastAPI Orchestrator acts as a bridge, managing parallel retrieval across multiple Qdrant collections and synthesizing the results before hand-off to the LLM. + +### Multimodal Vector Strategy & Similarity Search 
+The current logic effectively manages disparate vector dimensions to optimize retrieval accuracy Textual Dimensions (BERT):
 
 Data Embedding: Text chunks from PDFs, Markdown, and Word docs are processed via all-MiniLM-L6-v2, resulting in 384-dimensional vectors.
-Collection: Stored in data_pdf and data_text. +2. Visual Dimensions (CLIP):
+Collection: Stored in data_pdf and data_text. 
+Visual Dimensions (CLIP):
 Data Embedding: Images are processed via openai/clip-vit-base-patch32, resulting in 512-dimensional vectors.
-Collection: Stored in data_png. +3. Query Orchestration:
+Collection: Stored in data_png.
+Query Orchestration:
 When a user submits a query, the string is embedded twice in parallel:
 
    *   A **384-dim query vector** is generated for searching text collections.
    *   A **512-dim query vector** (using CLIP's text encoder) is generated for searching image collections.
 
-+4. Similarity & Search Logic:
+# Similarity & Search Logic:
 
 The system performs Cosine Similarity searches within each collection independently.
 Results are aggregated based on their similarity scores. High-scoring text chunks and images are then merged into a unified context block.
