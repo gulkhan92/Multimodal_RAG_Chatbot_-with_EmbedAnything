@@ -10,4 +10,9 @@ google-generativeai==0.7.2
 # Pinned to avoid build issues; let embed-anything resolve its own onnxruntime dependency.
 embed-anything==0.6.6
 
+fastapi
+uvicorn
+python-jose
+passlib[bcrypt] # [bcrypt] is needed for the bcrypt scheme
+python-multipart
 qdrant-client

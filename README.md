@@ -1,18 +1,59 @@
-# Multimodal RAG Chatbot (EmbedAnything + Gemini + Quadrant)
+# Enterprise Multimodal RAG Chatbot
 
-This repo builds a **multi-source Retrieval-Augmented Generation (RAG) chatbot** that can answer questions over everything under `data/`.
+A sophisticated **Retrieval-Augmented Generation (RAG)** system capable of performing multimodal analysis across diverse data types including PDFs and images. This project leverages **EmbedAnything** for local high-performance embeddings, **Qdrant** for vector storage, and **Google Gemini** for grounded, intelligent responses.
 
-## Initial MVP scope (implemented)
-- Ingest: **PDF** + **PNG** from `data/`
-- Embeddings: **EmbedAnything**
-- Vector DB: **Quadrant**
-- LLM answering: **Gemini**
-- Interface: **CLI chatbot** (first version)
+## 🚀 Key Features
+- **Multimodal Ingestion**: Seamlessly processes PDF documents and PNG images from a local directory.
+- **Dual-Model Embeddings**: Uses **BERT** for precise text representation and **CLIP** for visual content understanding.
+- **Vector Search**: High-speed retrieval using **Qdrant** with modality-specific collections.
+- **Grounded Reasoning**: Multimodal context (text and images) is passed to **Gemini 2.5 Flash** to ensure accurate, context-aware answers.
+- **Enterprise UI/UX**: A professional React-based dashboard with session management and secure authentication.
+- **Incremental Sync**: Intelligent data pipeline that only re-processes changed or new files.
 
-## Quick start
+## 🏗 Architecture Flow
 
-### 1) Install dependencies
-This project uses **Poetry** (via `pyproject.toml`).
+```mermaid
+graph TD
+    subgraph Ingestion_Layer
+        A[Local Data /data] --> B{File Type}
+        B -- PDF --> C[PDF Page Extractor]
+        B -- PNG --> D[Image Loader]
+        C --> E[Text Chunker]
+        E --> F[BERT Embedding]
+        D --> G[CLIP Embedding]
+        F --> H[(Qdrant: data_pdf)]
+        G --> I[(Qdrant: data_png)]
+    end
+
+    subgraph Retrieval_RAG
+        J[User Query] --> K{Interface}
+        K -- Web UI --> L[React App]
+        K -- CLI --> M[CLI Client]
+        L & M --> N[FastAPI Backend]
+        N --> O[BERT/CLIP Query Embedder]
+        O --> P[Similarity Search]
+        P --> Q[Grounded Context + Images]
+        Q --> R[Gemini LLM]
+        R --> S[Final Grounded Answer]
+    end
+```
+
+## 🛠 Technologies
+- **Language**: Python 3.11+
+- **Frontend**: React, TypeScript, Vite
+- **Backend**: FastAPI, Uvicorn
+- **AI/ML**: EmbedAnything (BERT & CLIP), Google Generative AI (Gemini)
+- **Database**: Qdrant (Local Persistent Mode)
+
+## 📋 Prerequisites
+- Python 3.11
+- Node.js & npm
+- Google Gemini API Key
+
+## ⚙️ Installation & Configuration
+
+### 1. Backend Setup
+This project uses **Poetry** for dependency management.
 
 ```bash
 poetry install
