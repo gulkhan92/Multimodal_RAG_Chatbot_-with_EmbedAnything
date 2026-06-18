@@ -49,14 +49,18 @@ def main() -> None:
         text_query_emb = text_client.embed_text([q])[0]
         store.collection = "data_pdf"
         text_chunks = store.similarity_search(embedding=text_query_emb, top_k=args.top_k)
-
+        
+        # Search generic text files (txt, md, docx)
+        store.collection = "data_text"
+        generic_text_chunks = store.similarity_search(embedding=text_query_emb, top_k=args.top_k)
+        
         # 2. Search Images (CLIP space)
         image_query_emb = image_client.embed_text([q])[0]
         store.collection = "data_png"
         image_chunks = store.similarity_search(embedding=image_query_emb, top_k=args.top_k)
 
         # Combine results
-        all_chunks = sorted(text_chunks + image_chunks, key=lambda x: x.score, reverse=True)[:args.top_k]
+        all_chunks = sorted(text_chunks + generic_text_chunks + image_chunks, key=lambda x: x.score, reverse=True)[:args.top_k]
 
         # Note: You may need to update your `answer_question` signature in answer.py 
         # to accept the pre-retrieved chunks directly.

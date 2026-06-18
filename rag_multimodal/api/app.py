@@ -69,7 +69,11 @@ async def chat(request: ChatRequest):
     text_query_emb = text_client.embed_text([q])[0]
     store.collection = "data_pdf"
     text_chunks = store.similarity_search(embedding=text_query_emb, top_k=request.top_k)
-
+    
+    # Search generic text files (txt, md, docx)
+    store.collection = "data_text"
+    generic_text_chunks = store.similarity_search(embedding=text_query_emb, top_k=request.top_k)
+    
     image_query_emb = image_client.embed_text([q])[0]
     store.collection = "data_png"
     image_chunks = store.similarity_search(embedding=image_query_emb, top_k=request.top_k)
@@ -77,7 +81,7 @@ async def chat(request: ChatRequest):
     all_chunks = sorted(text_chunks + image_chunks, key=lambda x: x.score, reverse=True)[: request.top_k]
 
     prompt = build_gemini_prompt(question=q, chunks=all_chunks)
-
+    
     from PIL import Image
     from pathlib import Path
 

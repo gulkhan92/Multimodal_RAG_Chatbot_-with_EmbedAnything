@@ -1,9 +1,8 @@
 # Enterprise Multimodal RAG Chatbot
 
-A sophisticated **Retrieval-Augmented Generation (RAG)** system capable of performing multimodal analysis across diverse data types including PDFs and images. This project leverages **EmbedAnything** for local high-performance embeddings, **Qdrant** for vector storage, and **Google Gemini** for grounded, intelligent responses.
+The Enterprise Multimodal RAG Chatbot is a state-of-the-art information synthesis engine designed for high-fidelity cross-modal intelligence. By harmonizing disparate data streams—including unstructured documents, complex PDFs, and visual assets—the platform delivers strategically grounded insights powered by the latest advancements in Retrieval-Augmented Generation. Leveraging a decentralized vector architecture and Google Gemini's generative capabilities, it transforms siloed organizational data into a unified, actionable knowledge base with enterprise-grade precision and scalability.
 
 ## 🚀 Key Features
-- **Multimodal Ingestion**: Seamlessly processes PDF documents and PNG images from a local directory.
 - **Dual-Model Embeddings**: Uses **BERT** for precise text representation and **CLIP** for visual content understanding.
 - **Vector Search**: High-speed retrieval using **Qdrant** with modality-specific collections.
 - **Grounded Reasoning**: Multimodal context (text and images) is passed to **Gemini 2.5 Flash** to ensure accurate, context-aware answers.
@@ -15,26 +14,36 @@ A sophisticated **Retrieval-Augmented Generation (RAG)** system capable of perfo
 ```mermaid
 graph TD
     subgraph Ingestion_Layer
-        A[Local Data /data] --> B{File Type}
-        B -- PDF --> C[PDF Page Extractor]
-        B -- PNG --> D[Image Loader]
-        C --> E[Text Chunker]
-        E --> F[BERT Embedding]
-        D --> G[CLIP Embedding]
-        F --> H[(Qdrant: data_pdf)]
-        G --> I[(Qdrant: data_png)]
+        direction TB
+        Data[Local Data Store /data] --> Dispatcher{File Dispatcher}
+        
+        subgraph Text_Pipeline
+            Dispatcher -- Documents --> T_Ext[Text/PDF Extractors]
+            T_Ext --> T_Chunk[Recursive Chunker]
+            T_Chunk --> T_Embed[BERT Embedder: 384-dim]
+            T_Embed --> V_Text[(Qdrant: data_text/pdf)]
+        end
+        
+        subgraph Vision_Pipeline
+            Dispatcher -- Images --> V_Load[Visual Asset Loader]
+            V_Load --> V_Embed[CLIP Embedder: 512-dim]
+            V_Embed --> V_Img[(Qdrant: data_png)]
+        end
     end
 
     subgraph Retrieval_RAG
-        J[User Query] --> K{Interface}
-        K -- Web UI --> L[React App]
-        K -- CLI --> M[CLI Client]
-        L & M --> N[FastAPI Backend]
-        N --> O[BERT/CLIP Query Embedder]
-        O --> P[Similarity Search]
-        P --> Q[Grounded Context + Images]
-        Q --> R[Gemini LLM]
-        R --> S[Final Grounded Answer]
+        direction TB
+        UI[User Interface] --> API[FastAPI Orchestrator]
+        API --> Query_Proc[Multi-Modal Query Embedding]
+        
+        subgraph Dual_Search
+            Query_Proc -- 384-dim Vector --> V_Text
+            Query_Proc -- 512-dim Vector --> V_Img
+        end
+        
+        Dual_Search --> Aggregator[Context Aggregator & Re-ranker]
+        Aggregator --> Gemini[Gemini 2.5 Flash]
+        Gemini --> Response[Grounded Insights]
     end
 ```
 
@@ -46,7 +55,7 @@ graph TD
 - **Database**: Qdrant (Local Persistent Mode)
 
 ## 📋 Prerequisites
-- Python 3.11
+- Python 3.11+
 - Node.js & npm
 - Google Gemini API Key
 

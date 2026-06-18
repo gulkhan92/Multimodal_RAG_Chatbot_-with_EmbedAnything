@@ -37,7 +37,7 @@ def build_gemini_prompt(*, question: str, chunks: List[RetrievedChunk]) -> str:
         text = (text or "").strip()
         if not text:
             if modality == "png":
-                text = f"(Visual context provided via attached image: {source})"
+                text = f"(Visual context provided via attached image: {source})" # Gemini will receive the actual image
             else:
                 text = f"(no extracted text available for this chunk)"
 
