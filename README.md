@@ -1,15 +1,15 @@
-# Enterprise Multimodal RAG Chatbot
+# Multimodal RAG Chatbot
 
-The Enterprise Multimodal RAG Chatbot is a state-of-the-art information synthesis engine designed for high-fidelity cross-modal intelligence. By harmonizing disparate data streams—including unstructured documents, complex PDFs, and visual assets—the platform delivers strategically grounded insights powered by the latest advancements in Retrieval-Augmented Generation. Leveraging a decentralized vector architecture and Google Gemini's generative capabilities, it transforms siloed organizational data into a unified, actionable knowledge base with enterprise-grade precision and scalability.
+The Multimodal RAG Chatbot is a state-of-the-art information synthesis engine designed for high-fidelity cross-modal intelligence. By harmonizing disparate data streams—including unstructured documents, complex PDFs, and visual assets—the platform delivers strategically grounded insights powered by the latest advancements in Retrieval-Augmented Generation. Leveraging a decentralized vector architecture and Google Gemini's generative capabilities, it transforms siloed organizational data into a unified, actionable knowledge base with enterprise-grade precision and scalability.
 
-## 🚀 Key Features
+## Key Features
 - **Dual-Model Embeddings**: Uses **BERT** for precise text representation and **CLIP** for visual content understanding.
 - **Vector Search**: High-speed retrieval using **Qdrant** with modality-specific collections.
 - **Grounded Reasoning**: Multimodal context (text and images) is passed to **Gemini 2.5 Flash** to ensure accurate, context-aware answers.
 - **Enterprise UI/UX**: A professional React-based dashboard with session management and secure authentication.
 - **Incremental Sync**: Intelligent data pipeline that only re-processes changed or new files.
 
-## 🏗 Architecture Flow
+## Architecture Flow
 
 ```mermaid
 graph TD
@@ -71,19 +71,19 @@ Results are aggregated based on their similarity scores. High-scoring text chunk
 Images are retrieved from local storage and passed as raw bytes alongside the text prompt to Gemini, allowing the LLM to perform final cross-modal reasoning.
 
 
-## 🛠 Technologies
+## Technologies
 - **Language**: Python 3.11+
 - **Frontend**: React, TypeScript, Vite
 - **Backend**: FastAPI, Uvicorn
 - **AI/ML**: EmbedAnything (BERT & CLIP), Google Generative AI (Gemini)
 - **Database**: Qdrant (Local Persistent Mode)
 
-## 📋 Prerequisites
+## Prerequisites
 - Python 3.11+
 - Node.js & npm
 - Google Gemini API Key
 
-## ⚙️ Installation & Configuration
+## Installation & Configuration
 
 ### 1. Backend Setup
 This project uses **Poetry** for dependency management.

@@ -213,6 +213,7 @@ def ingest_changed_pngs(
     if not files:
         print("No PNG files found.")
         return manifest
+
     store.collection = "data_png"
 
     for f in files:
@@ -234,6 +235,7 @@ def ingest_changed_pngs(
         )
 
         embedding = embed_client.embed_image(str(f.path))
+
         raw_id = f"{f.path.as_posix()}::img0"
         vec_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, raw_id))
 
@@ -246,6 +248,69 @@ def ingest_changed_pngs(
                     "file_name": f.path.name,
                     "modality": "png",
                     "image_id": "img0",
+                    "file_sha256": sha,
+                }
+            ],
+        )
+
+        manifest[key] = ManifestEntry(sha256=sha)
+
+    return manifest
+
+
+def ingest_changed_audios(
+    *,
+    data_dir: Path,
+    settings: Settings,
+    store: QuadrantStore,
+    embed_client: EmbedAnythingClient,
+    manifest: Dict[str, ManifestEntry],
+) -> Dict[str, ManifestEntry]:
+    """
+    Incrementally sync supported audio files into Quadrant.
+    Audio discovery is handled by loader.discover_files(...), which maps
+    multiple audio extensions to modality="audio".
+    """
+    files = [d for d in discover_files(data_dir) if d.modality == "audio"]
+    if not files:
+        print("No audio files found.")
+        return manifest
+
+    store.collection = "data_audio"
+
+    for f in files:
+        key = _file_key(data_dir, f.path)
+        sha = _sha256_file(f.path)
+        entry = manifest.get(key)
+
+        if entry and entry.sha256 == sha:
+            continue  # unchanged
+
+        print(f"[sync] Ingesting changed Audio: {f.path}")
+
+        # True sync: delete any previous vectors for this file before upserting new ones.
+        store.delete_by_filter(
+            filter_metadata={
+                "source_path": str(f.path),
+                "modality": "audio",
+            }
+        )
+
+        embedding = embed_client.embed_audio_file(str(f.path))
+
+        # single-vector per file for MVP
+        raw_id = f"{f.path.as_posix()}::audio0"
+        vec_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, raw_id))
+
+        store.upsert_embeddings(
+            ids=[vec_id],
+            embeddings=[embedding],
+            metadatas=[
+                {
+                    "source_path": str(f.path),
+                    "file_name": f.path.name,
+                    "modality": "audio",
+                    "audio_id": "audio0",
                     "file_sha256": sha,
                 }
             ],
@@ -311,6 +376,16 @@ def main() -> None:
         settings=settings,
         store=store,
         embed_client=image_client,
+        manifest=manifest,
+    )
+
+    # Audio embeddings (Whisper -> text embedding -> vector)
+    audio_client = EmbedAnythingClient(model_name=settings.embedanything_text_model)
+    manifest = ingest_changed_audios(
+        data_dir=data_dir,
+        settings=settings,
+        store=store,
+        embed_client=audio_client,
         manifest=manifest,
     )
 

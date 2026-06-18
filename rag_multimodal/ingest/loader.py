@@ -44,6 +44,11 @@ def discover_files(data_dir: str | os.PathLike) -> List[DiscoveredFile]:
             out.append(DiscoveredFile(path=p, modality="pdf"))
             continue
 
+        # Audio: map all supported audio formats to modality "audio"
+        if suffix in {"wav", "mp3", "m4a", "aac", "flac", "ogg", "oga", "opus", "wma"}:
+            out.append(DiscoveredFile(path=p, modality="audio"))
+            continue
+
         # Images: normalize all raster formats to modality "png" so sync can embed them.
         if suffix in {"png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "tif"}:
             out.append(DiscoveredFile(path=p, modality="png"))
