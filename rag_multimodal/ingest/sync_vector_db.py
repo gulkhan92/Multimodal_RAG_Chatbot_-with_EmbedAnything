@@ -11,6 +11,7 @@ from typing import Any, Dict, Iterable, List, Tuple
 from rag_multimodal.ingest.chunking import chunk_text
 from rag_multimodal.ingest.embed_anything import EmbedAnythingClient
 from rag_multimodal.ingest.loader import discover_files
+from rag_multimodal.ingest.media_extractor import extract_docx_images, extract_pdf_images_per_page
 from rag_multimodal.ingest.text_extractor import extract_text_from_file
 from rag_multimodal.ingest.doc_extractor import extract_text_from_docx
 from rag_multimodal.ingest.pdf_extractor import extract_pdf_text_per_page
@@ -58,6 +59,7 @@ def ingest_changed_pdfs(
     settings: Settings,
     store: QuadrantStore,
     embed_client: EmbedAnythingClient,
+    image_embed_client: EmbedAnythingClient,
     manifest: Dict[str, ManifestEntry],
 ) -> Dict[str, ManifestEntry]:
     files = [d for d in discover_files(data_dir) if d.modality == "pdf"]
@@ -67,6 +69,7 @@ def ingest_changed_pdfs(
     store.collection = "data_pdf"
 
     for f in files:
+        store.collection = "data_pdf"
         key = _file_key(data_dir, f.path)
         sha = _sha256_file(f.path)
         entry = manifest.get(key)
@@ -107,21 +110,59 @@ def ingest_changed_pdfs(
                     }
                 )
 
-        if for_upsert_ids:
-            # True sync: delete any previous vectors for this file before upserting new ones.
-            store.delete_by_filter(
-                filter_metadata={
-                    "source_path": str(f.path),
-                    "modality": "pdf",
-                }
-            )
+        # True sync: delete any previous vectors for this file before upserting new ones.
+        store.delete_by_filter(
+            filter_metadata={
+                "source_path": str(f.path),
+                "modality": "pdf",
+            }
+        )
 
+        if for_upsert_ids:
             store.upsert_embeddings(
                 ids=for_upsert_ids,
                 embeddings=for_upsert_embeddings,
                 metadatas=for_upsert_metadatas,
             )
 
+        page_images = extract_pdf_images_per_page(f.path)
+        store.collection = "data_png"
+        store.delete_by_filter(
+            filter_metadata={
+                "parent_source_path": str(f.path),
+                "source_modality": "pdf",
+            }
+        )
+
+        if page_images:
+            image_ids: List[str] = []
+            image_embeddings: List[List[float]] = []
+            image_metadatas: List[Dict[str, Any]] = []
+            for image in page_images:
+                raw_id = f"{f.path.as_posix()}::p{image.page_index}::img{image.image_index}"
+                image_ids.append(str(uuid.uuid5(uuid.NAMESPACE_DNS, raw_id)))
+                image_embeddings.append(image_embed_client.embed_image(str(image.path)))
+                image_metadatas.append(
+                    {
+                        "source_path": str(image.path),
+                        "file_name": image.path.name,
+                        "modality": "png",
+                        "source_modality": "pdf",
+                        "parent_source_path": str(f.path),
+                        "parent_file_name": f.path.name,
+                        "page": image.page_index,
+                        "image_id": f"img{image.image_index}",
+                        "file_sha256": sha,
+                    }
+                )
+
+            store.upsert_embeddings(
+                ids=image_ids,
+                embeddings=image_embeddings,
+                metadatas=image_metadatas,
+            )
+
+        if for_upsert_ids or page_images:
             manifest[key] = ManifestEntry(sha256=sha)
 
     return manifest
@@ -133,6 +174,7 @@ def ingest_changed_text_files(
     settings: Settings,
     store: QuadrantStore,
     embed_client: EmbedAnythingClient,
+    image_embed_client: EmbedAnythingClient,
     manifest: Dict[str, ManifestEntry],
 ) -> Dict[str, ManifestEntry]:
     files = [d for d in discover_files(data_dir) if d.modality in {"txt", "md", "docx"}]
@@ -142,6 +184,7 @@ def ingest_changed_text_files(
     store.collection = "data_text"  # Consolidate all text into 'data_text'
 
     for f in files:
+        store.collection = "data_text"
         key = _file_key(data_dir, f.path)
         sha = _sha256_file(f.path)
         entry = manifest.get(key)
@@ -161,41 +204,85 @@ def ingest_changed_text_files(
                 print(f"Skipping .docx file due to missing dependency: {e}")
                 continue
 
-        if not file_content.strip():
+        docx_images = []
+        if f.modality == "docx":
+            try:
+                docx_images = extract_docx_images(f.path)
+            except ImportError as e:
+                print(f"Skipping .docx images due to missing dependency: {e}")
+
+        if not file_content.strip() and not docx_images:
             print(f"Skipping empty or unextractable text from {f.path}")
             continue
 
         chunks = chunk_text(file_content)
-        if not chunks:
-            continue
-
         for_upsert_ids: List[str] = []
         for_upsert_embeddings: List[List[float]] = []
         for_upsert_metadatas: List[Dict[str, Any]] = []
 
-        chunk_texts = [c.text for c in chunks]
-        embeddings = embed_client.embed_text(chunk_texts)
+        if chunks:
+            chunk_texts = [c.text for c in chunks]
+            embeddings = embed_client.embed_text(chunk_texts)
 
-        for c, emb in zip(chunks, embeddings):
-            raw_id = f"{f.path.as_posix()}::c{c.chunk_index}"
-            chunk_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, raw_id))
-            for_upsert_ids.append(chunk_id)
-            for_upsert_embeddings.append(emb)
-            for_upsert_metadatas.append(
-                {
-                    "source_path": str(f.path),
-                    "file_name": f.path.name,
-                    "modality": f.modality,
-                    "chunk_index": c.chunk_index,
-                    "text": c.text,
-                    "chunk_text_len": len(c.text),
-                    "file_sha256": sha,
+            for c, emb in zip(chunks, embeddings):
+                raw_id = f"{f.path.as_posix()}::c{c.chunk_index}"
+                chunk_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, raw_id))
+                for_upsert_ids.append(chunk_id)
+                for_upsert_embeddings.append(emb)
+                for_upsert_metadatas.append(
+                    {
+                        "source_path": str(f.path),
+                        "file_name": f.path.name,
+                        "modality": f.modality,
+                        "chunk_index": c.chunk_index,
+                        "text": c.text,
+                        "chunk_text_len": len(c.text),
+                        "file_sha256": sha,
+                    }
+                )
+
+        store.delete_by_filter(filter_metadata={"source_path": str(f.path), "modality": f.modality})
+
+        if for_upsert_ids:
+            store.upsert_embeddings(ids=for_upsert_ids, embeddings=for_upsert_embeddings, metadatas=for_upsert_metadatas)
+
+        if f.modality == "docx":
+            store.collection = "data_png"
+            store.delete_by_filter(
+                filter_metadata={
+                    "parent_source_path": str(f.path),
+                    "source_modality": "docx",
                 }
             )
 
-        if for_upsert_ids:
-            store.delete_by_filter(filter_metadata={"source_path": str(f.path), "modality": f.modality})
-            store.upsert_embeddings(ids=for_upsert_ids, embeddings=for_upsert_embeddings, metadatas=for_upsert_metadatas)
+        if docx_images:
+            image_ids: List[str] = []
+            image_embeddings: List[List[float]] = []
+            image_metadatas: List[Dict[str, Any]] = []
+            for image in docx_images:
+                raw_id = f"{f.path.as_posix()}::img{image.image_index}"
+                image_ids.append(str(uuid.uuid5(uuid.NAMESPACE_DNS, raw_id)))
+                image_embeddings.append(image_embed_client.embed_image(str(image.path)))
+                image_metadatas.append(
+                    {
+                        "source_path": str(image.path),
+                        "file_name": image.path.name,
+                        "modality": "png",
+                        "source_modality": "docx",
+                        "parent_source_path": str(f.path),
+                        "parent_file_name": f.path.name,
+                        "image_id": f"img{image.image_index}",
+                        "file_sha256": sha,
+                    }
+                )
+
+            store.upsert_embeddings(
+                ids=image_ids,
+                embeddings=image_embeddings,
+                metadatas=image_metadatas,
+            )
+
+        if for_upsert_ids or docx_images:
             manifest[key] = ManifestEntry(sha256=sha)
 
     return manifest
@@ -362,6 +449,7 @@ def main() -> None:
         settings=settings,
         store=store,
         embed_client=text_client,
+        image_embed_client=image_client,
         manifest=manifest,
     )
     manifest = ingest_changed_text_files(
@@ -369,6 +457,7 @@ def main() -> None:
         settings=settings,
         store=store,
         embed_client=text_client, # Use text_client for all text modalities
+        image_embed_client=image_client,
         manifest=manifest,
     )
     manifest = ingest_changed_pngs(

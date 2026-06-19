@@ -5,6 +5,7 @@ The Multimodal RAG Chatbot is a state-of-the-art information synthesis engine de
 ## Key Features
 - **Dual-Model Embeddings**: Uses **BERT** for precise text representation and **CLIP** for visual content understanding.
 - **Vector Search**: High-speed retrieval using **Qdrant** with modality-specific collections.
+- **Page-Aware Mixed Documents**: PDFs are inspected page by page; text-only pages follow the text pipeline, while pages with embedded images also send those images to the visual embedding pipeline. Word documents keep their text flow and extract embedded images into the visual collection.
 - **Grounded Reasoning**: Multimodal context (text and images) is passed to **Gemini 2.5 Flash** to ensure accurate, context-aware answers.
 - **Enterprise UI/UX**: A professional React-based dashboard with session management and secure authentication.
 - **Incremental Sync**: Intelligent data pipeline that only re-processes changed or new files.
@@ -13,42 +14,55 @@ The Multimodal RAG Chatbot is a state-of-the-art information synthesis engine de
 
 ```mermaid
 graph TD
-    subgraph Ingestion_Layer
+    subgraph Ingestion["Ingestion Layer"]
         direction TB
-        Data[Local Data Store /data] --> Dispatcher{File Dispatcher}
+        Data["Local Data Store (/data)"] --> Dispatcher{"File Dispatcher"}
         
-        subgraph Text_Pipeline
-            Dispatcher -- Documents --> T_Ext[Text/PDF Extractors]
-            T_Ext --> T_Chunk[Recursive Chunker]
-            T_Chunk --> T_Embed[BERT Embedder: 384-dim]
-            T_Embed --> V_Text[(Qdrant: data_text/pdf)]
+        subgraph MixedDocs["Mixed Document Handling"]
+            Dispatcher -- "PDF" --> PDFPages["Extract text per page"]
+            PDFPages --> PageCheck{"Page has images?"}
+            PageCheck -- "No: text only" --> PDFText["Page text"]
+            PageCheck -- "Yes: text + images" --> PDFText
+            PageCheck -- "Yes: extract page images" --> EmbeddedImages["Extracted page images"]
+            Dispatcher -- "DOCX" --> DocxText["Extract document text"]
+            Dispatcher -- "DOCX embedded media" --> EmbeddedImages
         end
         
-        subgraph Vision_Pipeline
-            Dispatcher -- Images --> V_Load[Visual Asset Loader]
-            V_Load --> V_Embed[CLIP Embedder: 512-dim]
-            V_Embed --> V_Img[(Qdrant: data_png)]
+        subgraph TextPipeline["Text Pipeline"]
+            Dispatcher -- "TXT / MD" --> PlainText["Plain text extractor"]
+            PDFText --> Chunker["Recursive chunker"]
+            DocxText --> Chunker
+            PlainText --> Chunker
+            Chunker --> TextEmbed["BERT embedder: 384-dim"]
+            TextEmbed --> TextDB[("Qdrant: data_pdf / data_text")]
+        end
+
+        subgraph VisionPipeline["Vision Pipeline"]
+            Dispatcher -- "PNG / JPG / WebP / etc." --> ImageFiles["Image files"]
+            EmbeddedImages --> ImageEmbed["CLIP embedder: 512-dim"]
+            ImageFiles --> ImageEmbed
+            ImageEmbed --> ImageDB[("Qdrant: data_png")]
         end
     end
 
-    subgraph Retrieval_RAG
+    subgraph Retrieval["Retrieval RAG"]
         direction TB
-        UI[User Interface] --> API[FastAPI Orchestrator]
-        API --> Query_Proc[Multi-Modal Query Embedding]
+        UI["User Interface"] --> API["FastAPI Orchestrator"]
+        API --> QueryEmbed["Dual query embedding"]
         
-        subgraph Dual_Search
-            Query_Proc -- 384-dim Vector --> V_Text
-            Query_Proc -- 512-dim Vector --> V_Img
+        subgraph Search["Parallel Similarity Search"]
+            QueryEmbed -- "384-dim text vector" --> TextDB
+            QueryEmbed -- "512-dim CLIP text vector" --> ImageDB
         end
         
-        Dual_Search --> Aggregator[Context Aggregator & Re-ranker]
-        Aggregator --> Gemini[Gemini 2.5 Flash]
-        Gemini --> Response[Grounded Insights]
+        Search --> Aggregator["Context aggregator and re-ranker"]
+        Aggregator --> Gemini["Gemini 2.5 Flash"]
+        Gemini --> Response["Grounded answer with citations"]
     end
 ```
 
 # Architecture Discussion:
-The system architecture is built on the principle of Modality Isolation. Instead of forcing text and images into a single, potentially noisy shared latent space, we maintain dedicated pipelines for each data type. This ensures that the linguistic precision of BERT and the visual-semantic understanding of CLIP are preserved at their native resolutions. The FastAPI Orchestrator acts as a bridge, managing parallel retrieval across multiple Qdrant collections and synthesizing the results before hand-off to the LLM.
+The system architecture is built on the principle of Modality Isolation. Instead of forcing text and images into a single, potentially noisy shared latent space, we maintain dedicated pipelines for each data type. This ensures that the linguistic precision of BERT and the visual-semantic understanding of CLIP are preserved at their native resolutions. Mixed files are split at ingestion time: PDF text is still chunked per page, but embedded page images are extracted to local files and indexed in the image collection with metadata pointing back to the original document and page. DOCX files are treated similarly at the document-media level because Word files do not preserve stable rendered pages. The FastAPI Orchestrator acts as a bridge, managing parallel retrieval across multiple Qdrant collections and synthesizing the results before hand-off to the LLM.
 
 ## Multimodal Vector Strategy & Similarity Search:
 The current logic effectively manages disparate vector dimensions to optimize retrieval accuracy Textual Dimensions (BERT):
@@ -56,8 +70,10 @@ The current logic effectively manages disparate vector dimensions to optimize re
 Data Embedding: Text chunks from PDFs, Markdown, and Word docs are processed via all-MiniLM-L6-v2, resulting in 384-dimensional vectors.
 Collection: Stored in data_pdf and data_text. 
 Visual Dimensions (CLIP):
-Data Embedding: Images are processed via openai/clip-vit-base-patch32, resulting in 512-dimensional vectors.
+Data Embedding: Standalone images plus images extracted from PDF pages and DOCX media are processed via openai/clip-vit-base-patch32, resulting in 512-dimensional vectors.
 Collection: Stored in data_png.
+Mixed Document Routing:
+During ingestion, every PDF page is checked for embedded images. Text-only pages continue through the existing text chunking and BERT embedding path. Pages that contain images still contribute their text chunks, and each embedded image is extracted under `.rag_extracted_images/` and embedded with CLIP into `data_png`. Extracted image metadata includes the generated image path, parent document path, parent file name, page number when available, original modality, and image id.
 Query Orchestration:
 When a user submits a query, the string is embedded twice in parallel:
 
@@ -114,7 +130,7 @@ python -m rag_multimodal.chat.cli_chat --data-dir data
 ```
 
 ## Project layout
-- `rag_multimodal/ingest/*`: ingestion pipeline (PDF + PNG -> chunks -> embeddings -> Quadrant upsert)
+- `rag_multimodal/ingest/*`: ingestion pipeline (mixed documents + text + images -> chunks/media -> embeddings -> Qdrant upsert)
 - `rag_multimodal/rag/*`: retrieval + prompt construction for Gemini
 - `rag_multimodal/chat/*`: CLI chat loop
 

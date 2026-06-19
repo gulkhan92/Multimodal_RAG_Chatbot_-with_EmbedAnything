@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 from rag_multimodal.ingest.chunking import chunk_text
 from rag_multimodal.ingest.embed_anything import EmbedAnythingClient
 from rag_multimodal.ingest.loader import discover_files
+from rag_multimodal.ingest.media_extractor import extract_docx_images, extract_pdf_images_per_page
 from rag_multimodal.ingest.pdf_extractor import extract_pdf_text_per_page
 from rag_multimodal.ingest.text_extractor import extract_text_from_file
 from rag_multimodal.ingest.doc_extractor import extract_text_from_docx
@@ -17,6 +18,51 @@ from rag_multimodal.settings import Settings
 
 def _default_collection_for_modality(modality: str) -> str:
     return f"data_{modality}"
+
+
+def _upsert_extracted_images(
+    *,
+    source_path: Path,
+    images: List[Any],
+    settings: Settings,
+    store: QuadrantStore,
+    source_modality: str,
+    file_sha256: str | None = None,
+) -> None:
+    if not images:
+        return
+
+    store.collection = _default_collection_for_modality("png")
+    embed_client = EmbedAnythingClient(model_name=settings.embedanything_image_model)
+
+    ids: List[str] = []
+    embeddings: List[List[float]] = []
+    metadatas: List[Dict[str, Any]] = []
+
+    for image in images:
+        embedding = embed_client.embed_image(str(image.path))
+        page_part = f"::p{image.page_index}" if image.page_index is not None else ""
+        raw_id = f"{source_path.as_posix()}{page_part}::img{image.image_index}"
+        image_id = f"img{image.image_index}"
+        ids.append(str(uuid.uuid5(uuid.NAMESPACE_DNS, raw_id)))
+        embeddings.append(embedding)
+        metadata: Dict[str, Any] = {
+            "source_path": str(image.path),
+            "file_name": image.path.name,
+            "modality": "png",
+            "source_modality": source_modality,
+            "parent_source_path": str(source_path),
+            "parent_file_name": source_path.name,
+            "image_id": image_id,
+        }
+        if image.page_index is not None:
+            metadata["page"] = image.page_index
+        if file_sha256 is not None:
+            metadata["file_sha256"] = file_sha256
+        metadatas.append(metadata)
+
+    store.upsert_embeddings(ids=ids, embeddings=embeddings, metadatas=metadatas)
+
 
 # --- PDF Ingestion ---
 def ingest_pdfs(*, data_dir: str | Path, settings: Settings, store: QuadrantStore) -> None:
@@ -29,6 +75,7 @@ def ingest_pdfs(*, data_dir: str | Path, settings: Settings, store: QuadrantStor
     embed_client = EmbedAnythingClient(model_name=settings.embedanything_text_model)
 
     for f in files:
+        store.collection = _default_collection_for_modality("pdf")
         print(f"Ingesting PDF: {f.path}")
         pages = extract_pdf_text_per_page(f.path)
 
@@ -66,6 +113,17 @@ def ingest_pdfs(*, data_dir: str | Path, settings: Settings, store: QuadrantStor
         if all_ids:
             store.upsert_embeddings(ids=all_ids, embeddings=all_embeddings, metadatas=all_metadatas)
 
+        page_images = extract_pdf_images_per_page(f.path)
+        if page_images:
+            print(f"Ingesting {len(page_images)} image(s) extracted from PDF pages: {f.path}")
+            _upsert_extracted_images(
+                source_path=f.path,
+                images=page_images,
+                settings=settings,
+                store=store,
+                source_modality="pdf",
+            )
+
 
 # --- Generic Text File Ingestion (.txt, .md, .docx) ---
 def ingest_text_files(*, data_dir: str | Path, settings: Settings, store: QuadrantStore) -> None:
@@ -78,6 +136,7 @@ def ingest_text_files(*, data_dir: str | Path, settings: Settings, store: Quadra
     embed_client = EmbedAnythingClient(model_name=settings.embedanything_text_model)
 
     for f in files:
+        store.collection = _default_collection_for_modality("text")
         print(f"Ingesting Text File: {f.path}")
         
         file_content = ""
@@ -122,6 +181,23 @@ def ingest_text_files(*, data_dir: str | Path, settings: Settings, store: Quadra
             )
         if all_ids:
             store.upsert_embeddings(ids=all_ids, embeddings=all_embeddings, metadatas=all_metadatas)
+
+        if f.modality == "docx":
+            try:
+                docx_images = extract_docx_images(f.path)
+            except ImportError as e:
+                print(f"Skipping .docx images due to missing dependency: {e}")
+                docx_images = []
+
+            if docx_images:
+                print(f"Ingesting {len(docx_images)} image(s) extracted from DOCX: {f.path}")
+                _upsert_extracted_images(
+                    source_path=f.path,
+                    images=docx_images,
+                    settings=settings,
+                    store=store,
+                    source_modality="docx",
+                )
 
 
 def ingest_pngs(*, data_dir: str | Path, settings: Settings, store: QuadrantStore) -> None:

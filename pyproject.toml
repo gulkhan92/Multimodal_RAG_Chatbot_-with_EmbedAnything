@@ -2,7 +2,7 @@
 name = "rag_multimodal"
 version = "0.1.0"
 description = "Multi-modal RAG chatbot using EmbedAnything + Gemini + Quadrant"
-authors = ["-"]
+author = [" Gul Hameed Khan"]
 readme = "README.md"
 packages = [{ include = "rag_multimodal" }]
 
