@@ -1,11 +1,11 @@
-# Multimodal RAG Chatbot
+# Enterprise Multimodal RAG Chatbot
 
 The Multimodal RAG Chatbot is a state-of-the-art information synthesis engine designed for high-fidelity cross-modal intelligence. By harmonizing disparate data streams—including unstructured documents, complex PDFs, and visual assets—the platform delivers strategically grounded insights powered by the latest advancements in Retrieval-Augmented Generation. Leveraging a decentralized vector architecture and Google Gemini's generative capabilities, it transforms siloed organizational data into a unified, actionable knowledge base with enterprise-grade precision and scalability.
 
 ## Key Features
 - **Dual-Model Embeddings**: Uses **BERT** for precise text representation and **CLIP** for visual content understanding.
 - **Vector Search**: High-speed retrieval using **Qdrant** with modality-specific collections.
-- **Page-Aware Mixed Documents**: PDFs are inspected page by page; text-only pages follow the text pipeline, while pages with embedded images also send those images to the visual embedding pipeline. Word documents keep their text flow and extract embedded images into the visual collection.
+- **Advanced Document Processing**: Handles PDFs, DOCX, Markdown, and plain text files. Extracts and indexes embedded images from PDFs and DOCX files, linking them back to their parent document.
 - **Grounded Reasoning**: Multimodal context (text and images) is passed to **Gemini 2.5 Flash** to ensure accurate, context-aware answers.
 - **Enterprise UI/UX**: A professional React-based dashboard with session management and secure authentication.
 - **Incremental Sync**: Intelligent data pipeline that only re-processes changed or new files.
@@ -16,16 +16,16 @@ The Multimodal RAG Chatbot is a state-of-the-art information synthesis engine de
 graph TD
     subgraph Ingestion["Ingestion Layer"]
         direction TB
-        Data["Local Data Store (/data)"] --> Dispatcher{"File Dispatcher"}
+        Data["Local Data Store /data"] --> Dispatcher{"File Dispatcher"}
         
-        subgraph MixedDocs["Mixed Document Handling"]
+        subgraph TextPipeline["Text & Mixed Document Pipeline"]
             Dispatcher -- "PDF" --> PDFPages["Extract text per page"]
             PDFPages --> PageCheck{"Page has images?"}
             PageCheck -- "No: text only" --> PDFText["Page text"]
             PageCheck -- "Yes: text + images" --> PDFText
-            PageCheck -- "Yes: extract page images" --> EmbeddedImages["Extracted page images"]
+            PageCheck -- "Yes: extract page images" --> EmbeddedImages["Extracted Images"]
             Dispatcher -- "DOCX" --> DocxText["Extract document text"]
-            Dispatcher -- "DOCX embedded media" --> EmbeddedImages
+            Dispatcher -- "DOCX" --> EmbeddedImages
         end
         
         subgraph TextPipeline["Text Pipeline"]
@@ -38,7 +38,7 @@ graph TD
         end
 
         subgraph VisionPipeline["Vision Pipeline"]
-            Dispatcher -- "PNG / JPG / WebP / etc." --> ImageFiles["Image files"]
+            Dispatcher -- "PNG / JPG" --> ImageFiles["Image Files"]
             EmbeddedImages --> ImageEmbed["CLIP embedder: 512-dim"]
             ImageFiles --> ImageEmbed
             ImageEmbed --> ImageDB[("Qdrant: data_png")]
@@ -47,7 +47,7 @@ graph TD
 
     subgraph Retrieval["Retrieval RAG"]
         direction TB
-        UI["User Interface"] --> API["FastAPI Orchestrator"]
+        UI["React Frontend"] --> API["FastAPI Orchestrator"]
         API --> QueryEmbed["Dual query embedding"]
         
         subgraph Search["Parallel Similarity Search"]
@@ -56,7 +56,7 @@ graph TD
         end
         
         Search --> Aggregator["Context aggregator and re-ranker"]
-        Aggregator --> Gemini["Gemini 2.5 Flash"]
+        Aggregator --> Gemini["Gemini LLM"]
         Gemini --> Response["Grounded answer with citations"]
     end
 ```

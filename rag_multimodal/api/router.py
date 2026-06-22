@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends
@@ -25,16 +26,22 @@ def build_chat_routes(
     @router.post("/chat", response_model=ChatResponse, dependencies=[Depends(RoleChecker(["viewer"]))])
     async def chat(request: ChatRequest) -> ChatResponse:
         q = request.question
+        logging.info(f"Received chat request: question='{q}', top_k={request.top_k}")
 
+        logging.info("Embedding query for text search...")
         text_query_emb = text_client.embed_text([q])[0]
-        store.collection = "data_pdf"
+        store.collection = "data_text"
+        logging.info("Searching collection 'data_text'...")
         text_chunks = store.similarity_search(embedding=text_query_emb, top_k=request.top_k)
 
+        logging.info("Embedding query for image search...")
         image_query_emb = image_client.embed_text([q])[0]
         store.collection = "data_png"
+        logging.info("Searching collection 'data_png'...")
         image_chunks = store.similarity_search(embedding=image_query_emb, top_k=request.top_k)
 
         all_chunks = sorted(text_chunks + image_chunks, key=lambda x: x.score, reverse=True)[: request.top_k]
+        logging.info(f"Retrieved {len(all_chunks)} total chunks after aggregation.")
 
         prompt = build_gemini_prompt(question=q, chunks=all_chunks)
 
@@ -49,7 +56,9 @@ def build_chat_routes(
                         contents.append(Image.open(p))
                         seen_images.add(img_path)
 
+        logging.info(f"Generating response with Gemini. Passing {len(contents) - 1} images.")
         gemini_resp = gemini.generate(contents=contents)
+        logging.info("Successfully received response from Gemini.")
 
         return ChatResponse(
             answer=gemini_resp.text.strip(),

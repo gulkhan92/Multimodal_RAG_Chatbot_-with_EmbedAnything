@@ -11,8 +11,13 @@ class WebSocketLogHandler(logging.Handler):
 
     def emit(self, record):
         log_entry = self.format(record)
-        # Use asyncio.create_task to send the message without blocking the logger
-        asyncio.create_task(self.manager.broadcast(log_entry))
+        try:
+            # Get the running event loop. This will fail if called outside of an async context.
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.manager.broadcast(log_entry))
+        except RuntimeError:
+            # No running event loop, so we can't broadcast. This happens on app startup.
+            pass
 
 
 def setup_logging(log_manager=None):

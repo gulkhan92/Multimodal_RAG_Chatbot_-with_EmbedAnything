@@ -47,3 +47,4 @@ dist/
 *.tar.gz
 
 node_modules/
+rag_app.db/

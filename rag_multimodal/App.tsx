@@ -19,7 +19,7 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
-  const [activeTab, setActiveTab] = useState<'chat' | 'monitoring'>('chat');
+  const [isMonitoringOpen, setIsMonitoringOpen] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoginView, setIsLoginView] = useState(true);
   const [username, setUsername] = useState('');
@@ -86,7 +86,7 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    if (token && activeTab === 'monitoring') {
+    if (token) {
       const ws = new WebSocket('ws://localhost:8000/ws/logs');
       ws.onmessage = (event) => {
         try {
@@ -102,7 +102,7 @@ const App: React.FC = () => {
         ws.close();
       };
     }
-  }, [token, activeTab]);
+  }, [token]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,8 +146,7 @@ const App: React.FC = () => {
   if (!token) {
     return (
       <div className="app-container" style={{ justifyContent: 'center', alignItems: 'center' }}>
-        <form
-          onSubmit={handleLogin}
+        <div
           style={{
             background: '#fff',
             border: '1px solid var(--border-color)',
@@ -190,7 +189,7 @@ const App: React.FC = () => {
               {isLoginView ? 'Sign Up' : 'Login'}
             </a>
           </p>
-        </form>
+        </div>
       </div>
     );
   }
@@ -200,65 +199,73 @@ const App: React.FC = () => {
       <aside className="sidebar">
         <div className="logo">
           <span style={{ width: 10, height: 10, borderRadius: 999, background: 'var(--primary-color)' }} />
-          <span>Multimodal RAG</span>
+          <span>Multimodal RAG based Chatbot</span>
         </div>
         <div style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.5 }}>
           Ask questions over everything in <b>data/</b>.
         </div>
         <hr style={{ border: '0', borderTop: '1px solid var(--border-color)', margin: '20px 0' }} />
         <nav>
-            <div onClick={() => setActiveTab('chat')} style={{ padding: '8px 0', fontWeight: activeTab === 'chat' ? 600 : 400, color: activeTab === 'chat' ? 'var(--primary-color)' : 'inherit', cursor: 'pointer' }}>Chat</div>
-            <div onClick={() => setActiveTab('monitoring')} style={{ padding: '8px 0', fontWeight: activeTab === 'monitoring' ? 600 : 400, color: activeTab === 'monitoring' ? 'var(--primary-color)' : 'inherit', cursor: 'pointer' }}>Monitoring</div>
+            <div style={{ padding: '8px 0', fontWeight: 600, color: 'var(--primary-color)', cursor: 'pointer' }}>Chat</div>
+            <div 
+              onClick={() => setIsMonitoringOpen(!isMonitoringOpen)} 
+              style={{ padding: '8px 0', fontWeight: 600, color: 'var(--primary-color)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              <span>Monitoring</span>
+              <span style={{ transform: isMonitoringOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▶</span>
+            </div>
             <div style={{ padding: '8px 0', cursor: 'pointer' }}>Settings</div>
         </nav>
-      </aside>
-
-      <main className="chat-main">
-        <header className="chat-header">
-          <div style={{ fontWeight: 700 }}>{activeTab === 'chat' ? 'Chat' : 'Live Monitoring'}</div>
-          <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Grounded responses via Qdrant</div>
-        </header>
-
-        {activeTab === 'chat' ? (
-          <>
-            <div className="message-list">
-              {messages.map((m, i) => (
-                <div key={i} className={`message ${m.sender}`}>
-                  <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{m.text}</p>
-
-                  {m.sources && m.sources.length > 0 && (
-                    <div className="sources-container">Sources: {m.sources.join(', ')}</div>
-                  )}
-                </div>
-              ))}
-              {loading && <div className="loading">Assistant is thinking...</div>}
-            </div>
-
-            <section className="input-wrapper">
-              <div className="input-container">
-                <input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask about your data..."
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !loading) handleSend();
-                  }}
-                />
-                <button className="send-btn" onClick={handleSend} disabled={loading}>
-                  Send
-                </button>
-              </div>
-            </section>
-          </>
-        ) : (
-          <div className="message-list" style={{ fontFamily: 'monospace', fontSize: '12px' }}>
+        {isMonitoringOpen && (
+          <div className="monitoring-panel">
+            {logs.length === 0 && <div className="log-entry" style={{color: 'var(--text-muted)'}}>Waiting for logs...</div>}
             {logs.map((log, i) => (
-              <div key={i} style={{ color: log.level === 'INFO' ? 'inherit' : 'red' }}>
-                <span style={{ color: 'var(--text-muted)'}}>{log.timestamp}</span> [{log.level}] {log.message}
+              <div key={i} className={`log-entry ${log.level.toLowerCase()}`}>
+                <span className="log-timestamp">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                <span className="log-level">[{log.level}]</span>
+                <span className="log-message">{log.message}</span>
               </div>
             ))}
           </div>
         )}
+      </aside>
+
+      <main className="chat-main">
+        <header className="chat-header">
+          <div style={{ fontWeight: 700 }}>Chat</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Grounded responses via Qdrant</div>
+        </header>
+
+        <>
+          <div className="message-list">
+            {messages.map((m, i) => (
+              <div key={i} className={`message ${m.sender}`}>
+                <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{m.text}</p>
+
+                {m.sources && m.sources.length > 0 && (
+                  <div className="sources-container">Sources: {m.sources.join(', ')}</div>
+                )}
+              </div>
+            ))}
+            {loading && <div className="loading">Assistant is thinking...</div>}
+          </div>
+
+          <section className="input-wrapper">
+            <div className="input-container">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask about your data..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !loading) handleSend();
+                }}
+              />
+              <button className="send-btn" onClick={handleSend} disabled={loading}>
+                Send
+              </button>
+            </div>
+          </section>
+        </>
       </main>
     </div>
   );

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from dotenv import load_dotenv
 
 
@@ -20,7 +21,9 @@ class Settings:
 
     @staticmethod
     def from_env() -> "Settings":
-        load_dotenv()
+        # Explicitly load .env from the project root to avoid path issues.
+        env_path = Path('.') / '.env'
+        load_dotenv(dotenv_path=env_path)
 
         gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
         secret_key = os.getenv("SECRET_KEY", "default_secret_for_dev_only").strip()

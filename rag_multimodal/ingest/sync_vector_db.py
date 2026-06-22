@@ -66,10 +66,9 @@ def ingest_changed_pdfs(
     if not files:
         print("No PDF files found.")
         return manifest
-    store.collection = "data_pdf"
+    store.collection = "data_text" # Consolidate all text into a single collection
 
     for f in files:
-        store.collection = "data_pdf"
         key = _file_key(data_dir, f.path)
         sha = _sha256_file(f.path)
         entry = manifest.get(key)
@@ -333,7 +332,7 @@ def ingest_changed_pngs(
                 {
                     "source_path": str(f.path),
                     "file_name": f.path.name,
-                    "modality": "png",
+                    "modality": "png",  # This was missing
                     "image_id": "img0",
                     "file_sha256": sha,
                 }

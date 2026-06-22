@@ -1,15 +1,16 @@
 from datetime import datetime, timedelta
 from typing import Optional, List
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from rag_multimodal.settings import Settings
 from rag_multimodal.database import SessionLocal, User as DBUser
+import bcrypt
 
+# Load environment variables
 settings = Settings.from_env()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
 
 class User(BaseModel):
@@ -18,7 +19,7 @@ class User(BaseModel):
     roles: List[str] = ["viewer"]
 
     class Config:
-        orm_mode = True
+        from_attributes = True # Pydantic V2 uses from_attributes instead of orm_mode
 
 class TokenData(BaseModel):
     username: Optional[str] = None
@@ -36,7 +37,7 @@ def get_db():
     finally:
         db.close()
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -51,9 +52,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise credentials_exception
 
-    db = SessionLocal()
     db_user = db.query(DBUser).filter(DBUser.username == token_data.username).first()
-    db.close()
 
     if db_user is None:
         raise credentials_exception
@@ -71,7 +70,20 @@ def RoleChecker(allowed_roles: List[str]):
     return _check
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    """Hashes a password using bcrypt, truncating it to 72 bytes for compatibility."""
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        password_bytes = password_bytes[:72]
+    
+    hashed_bytes = bcrypt.hashpw(password_bytes, bcrypt.gensalt())
+    return hashed_bytes.decode('utf-8')
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verifies a password against a bcrypt hash, truncating it to 72 bytes for compatibility."""
+    password_bytes = plain_password.encode('utf-8')
+    if len(password_bytes) > 72:
+        password_bytes = password_bytes[:72]
+    
+    hashed_password_bytes = hashed_password.encode('utf-8')
+    
+    return bcrypt.checkpw(password_bytes, hashed_password_bytes)

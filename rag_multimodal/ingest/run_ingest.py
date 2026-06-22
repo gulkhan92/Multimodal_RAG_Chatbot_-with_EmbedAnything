@@ -17,7 +17,11 @@ from rag_multimodal.settings import Settings
 
 
 def _default_collection_for_modality(modality: str) -> str:
-    return f"data_{modality}"
+    if modality in {"pdf", "txt", "md", "docx"}:
+        return "data_text"
+    elif modality == "png":
+        return "data_png"
+    return f"data_{modality}" # Fallback for other types
 
 
 def _upsert_extracted_images(
@@ -71,11 +75,10 @@ def ingest_pdfs(*, data_dir: str | Path, settings: Settings, store: QuadrantStor
         print("No PDF files found.")
         return
 
-    store.collection = _default_collection_for_modality("pdf")
+    store.collection = _default_collection_for_modality("text")
     embed_client = EmbedAnythingClient(model_name=settings.embedanything_text_model)
 
     for f in files:
-        store.collection = _default_collection_for_modality("pdf")
         print(f"Ingesting PDF: {f.path}")
         pages = extract_pdf_text_per_page(f.path)
 

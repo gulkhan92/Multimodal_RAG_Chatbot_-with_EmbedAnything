@@ -45,6 +45,36 @@ body, html {
   gap: 10px;
 }
 
+/* Monitoring Panel in Sidebar */
+.monitoring-panel {
+  margin-top: 16px;
+  background-color: #f7fafc;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  height: 300px; /* Or adjust as needed */
+  overflow-y: auto;
+  padding: 12px;
+  font-family: 'Menlo', 'Consolas', monospace;
+  font-size: 0.75rem;
+  display: flex;
+  flex-direction: column-reverse; /* Newest logs at the bottom, scrolls up */
+}
+
+.log-entry {
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.log-entry.error {
+  color: #c53030;
+}
+
+.log-timestamp {
+  color: var(--text-muted);
+  margin-right: 8px;
+}
+
 /* Main Chat Area */
 .chat-main {
   flex: 1;
