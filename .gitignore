@@ -2,116 +2,48 @@
 __pycache__/
 *.py[cod]
 *.so
-*.egg-info/
-.venv/
-*.py[cod] # Compiled Python files
-*.so      # Compiled extensions
-*.egg-info/ # Egg info metadata
+*.egg-info
 
-# Virtual envs / tooling
-.venv*    # All .venv folders
+# Virtual Environments
+.venv*
 venv/
-.venv311/
 ENV/
 env/
-data/
-qdrant_data/
-qdrant_data.67660/
-qdrant_data.71297/
-qdrant_data.72346/
-qdrant_data.73617/
-qdrant_data.74503/
 
+# IDE / Editor / OS
+.vscode/
+.idea/
+.DS_Store
 
-# Virtual envs / tooling
+# Development Tools
 .mypy_cache/
 .pytest_cache/
 .coverage
 htmlcov/
 .tox/
 .ruff_cache/
+.ipynb_checkpoints/
 
 # Env files / secrets
-.env
-.env.*
-*.env
-.envrc
 # IMPORTANT: Never commit secret files
 .env*
 !.env.example
 
-# OS / editor
-.DS_Store
-.vscode/
-.idea/
-
-# Project data (do not ignore the corpus by default)
-# data/
-# Project data and local databases
+# Project Data & Databases (DO NOT COMMIT)
 data/
 qdrant_data*
 *.db
+.rag_extracted_images/
 
 # Local ingest manifests (if you create/track them locally)
 .rag_ingest_manifest.json
 .rag_*manifest*.json
 
-# Build / dist
+# Build artifacts
 build/
 dist/
-*.wheel
+*.egg
+*.whl
 *.tar.gz
 
-# Notebook checkpoints
-.ipynb_checkpoints/
-.rag_ingest_manifest.json
-*.egg
-*.whl
-
-# Python
-__pycache__/
-*.py[cod] # Compiled Python files
-*.so      # Compiled extensions
-*.egg-info/ # Egg info metadata
-
-# Virtual envs / tooling
-.venv*    # All .venv folders
-venv/
-ENV/
-env/
-.mypy_cache/
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-.ruff_cache/
-
-# Env files / secrets
-# IMPORTANT: Never commit secret files
-.env*
-!.env.example
-
-# OS / editor
-.DS_Store
-.vscode/
-.idea/
-
-# Project data and local databases
-data/
-qdrant_data*
-*.db
-
-# Local ingest manifests (if you create/track them locally)
-.rag_ingest_manifest.json
-.rag_*manifest*.json
-
-# Build / dist
-build/
-dist/
-*.egg
-*.whl
-
-# Local Qdrant directories
-qdrant_data*
-*.egg
-*.whl
+node_modules/
