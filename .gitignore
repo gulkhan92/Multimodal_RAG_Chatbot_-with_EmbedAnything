@@ -8,3 +8,9 @@ __pycache__/
 
 # Local sync manifest
 .rag_ingest_manifest.json
+
+# Data files
+data/
+
+# Qdrant local storage
+qdrant_data*

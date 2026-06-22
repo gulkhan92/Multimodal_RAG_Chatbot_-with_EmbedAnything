@@ -50,26 +50,10 @@ class QuadrantStore:
         # will raise a RuntimeError/AlreadyLocked. In that case, fall back to
         # server mode (url) if available, so the API can still start.
         if path:
-            try:
-                # Persistent local Qdrant storage
-                self._client = QdrantClient(path=path)
-            except Exception as e:
-                # Qdrant local mode uses file locking.
-                # If another instance already holds the lock, we either:
-                #   1) fall back to server mode (if url is provided), or
-                #   2) create a PID-suffixed local folder to avoid the lock.
-                if url:
-                    self._client = QdrantClient(url=url, api_key=api_key)
-                else:
-                    pid_path = f"{path}.{os.getpid()}"
-                    try:
-                        self._client = QdrantClient(path=pid_path)
-                    except Exception:
-                        raise RuntimeError(
-                            f"Failed to open Qdrant local storage at path={path}. "
-                            f"Attempted PID-isolated fallback at {pid_path} and it also failed. "
-                            "Stop other running Qdrant local clients, or set QUADRANT_URL for server mode."
-                        ) from e
+            # Persistent local Qdrant storage.
+            # If this fails due to a lock, it will raise an exception, which is
+            # the desired behavior to prevent multiple writers.
+            self._client = QdrantClient(path=path)
         else:
             if not url:
                 raise RuntimeError("QuadrantStore requires either `url` or `path`.")
