@@ -6,14 +6,19 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from rag_multimodal.settings import Settings
+from rag_multimodal.database import SessionLocal, User as DBUser
 
 settings = Settings.from_env()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
 
 class User(BaseModel):
     username: str
+    email: Optional[str] = None
     roles: List[str] = ["viewer"]
+
+    class Config:
+        orm_mode = True
 
 class TokenData(BaseModel):
     username: Optional[str] = None
@@ -23,6 +28,13 @@ def create_access_token(data: dict):
     expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
@@ -38,16 +50,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         token_data = TokenData(username=username)
     except JWTError:
         raise credentials_exception
-    
-    # Mock user database lookup
-    user_db = {
-        "admin_user": {"username": "admin_user", "roles": ["admin", "viewer"]},
-        "staff_user": {"username": "staff_user", "roles": ["viewer"]}
-    }
-    user_dict = user_db.get(token_data.username)
-    if user_dict is None:
+
+    db = SessionLocal()
+    db_user = db.query(DBUser).filter(DBUser.username == token_data.username).first()
+    db.close()
+
+    if db_user is None:
         raise credentials_exception
-    return User(**user_dict)
+    
+    return User(username=db_user.username, email=db_user.email, roles=[role.name for role in db_user.roles])
 
 def RoleChecker(allowed_roles: List[str]):
     def _check(user: User = Depends(get_current_user)):

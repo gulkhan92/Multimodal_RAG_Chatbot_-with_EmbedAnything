@@ -1,48 +1,10 @@
 # Python
 __pycache__/
-*.py[cod]
-*.so
-*.egg-info/
-.venv/
-venv/
-.venv311/
-ENV/
-env/
-data/
-qdrant_data/
+*.pyc
+.venv*
 
-# Virtual envs / tooling
-.mypy_cache/
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-.ruff_cache/
+# Database
+*.db
 
-# Env files / secrets
-.env
-.env.*
-*.env
-.envrc
-
-# OS / editor
-.DS_Store
-.vscode/
-.idea/
-
-# Project data (do not ignore the corpus by default)
-# data/
-
-# Local ingest manifests (if you create/track them locally)
-.rag_ingest_manifest.json
-.rag_*manifest*.json
-
-# Build / dist
-build/
-dist/
-*.wheel
-*.tar.gz
-
-# Notebook checkpoints
-.ipynb_checkpoints/
+# Local sync manifest
 .rag_ingest_manifest.json

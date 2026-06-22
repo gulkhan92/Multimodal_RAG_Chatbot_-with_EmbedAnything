@@ -14,6 +14,7 @@ class Settings:
     embedanything_text_model: str
     embedanything_image_model: str
     secret_key: str
+    default_admin_password: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
@@ -23,6 +24,7 @@ class Settings:
 
         gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
         secret_key = os.getenv("SECRET_KEY", "default_secret_for_dev_only").strip()
+        default_admin_password = os.getenv("DEFAULT_ADMIN_PASSWORD", "admin").strip()
 
         quadrant_url = os.getenv("QUADRANT_URL", "").strip()
         quadrant_path = os.getenv("QUADRANT_PATH", "").strip()
@@ -45,5 +47,6 @@ class Settings:
             quadrant_api_key=quadrant_api_key,
             embedanything_text_model=embedanything_text_model,
             embedanything_image_model=embedanything_image_model,
-            secret_key=secret_key
+            secret_key=secret_key,
+            default_admin_password=default_admin_password,
         )

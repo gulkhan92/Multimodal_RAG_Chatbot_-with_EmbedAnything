@@ -21,6 +21,10 @@ const App: React.FC = () => {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [activeTab, setActiveTab] = useState<'chat' | 'monitoring'>('chat');
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [isLoginView, setIsLoginView] = useState(true);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
 
   const getToken = () => localStorage.getItem('token');
 
@@ -100,57 +104,93 @@ const App: React.FC = () => {
     }
   }, [token, activeTab]);
 
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const form = new URLSearchParams();
+      form.append('username', username);
+      form.append('password', password);
+
+      const resp = await axios.post('http://localhost:8000/token', form, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+
+      const accessToken = resp.data?.access_token;
+      if (!accessToken) throw new Error('No access_token in /token response');
+
+      localStorage.setItem('token', accessToken);
+      setToken(accessToken);
+    } catch (err) {
+      console.error('Login error:', err);
+      alert('Login failed. Please check your credentials.');
+    }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await axios.post('http://localhost:8000/users/signup', {
+        username,
+        email,
+        password,
+      });
+      alert('Signup successful! Please log in.');
+      setIsLoginView(true); // Switch to login view
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      const detail = err.response?.data?.detail || 'An unknown error occurred.';
+      alert(`Signup failed: ${detail}`);
+    }
+  };
 
   if (!token) {
     return (
       <div className="app-container" style={{ justifyContent: 'center', alignItems: 'center' }}>
-        <div
+        <form
+          onSubmit={handleLogin}
           style={{
             background: '#fff',
             border: '1px solid var(--border-color)',
             borderRadius: 12,
-            padding: 28,
+            padding: 32,
             boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-            maxWidth: 520,
-            width: '100%',
+            width: 360,
           }}
         >
-          <h2 style={{ marginTop: 0 }}>Login to Multimodal RAG</h2>
-          <button
-            className="send-btn"
-            onClick={async () => {
-              try {
-                const form = new URLSearchParams();
-                // Backend /token uses OAuth2PasswordRequestForm and checks username only (MVP)
-                form.append('username', 'staff_user');
-                form.append('password', 'anything');
-
-                const resp = await axios.post('http://localhost:8000/token', form, {
-                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                });
-
-                const accessToken = resp.data?.access_token;
-                const tokenType = resp.data?.token_type;
-
-                console.debug('[FE] /token response:', {
-                  hasAccessToken: !!accessToken,
-                  accessTokenLen: accessToken ? String(accessToken).length : 0,
-                  token_type: tokenType,
-                });
-
-                if (!accessToken) throw new Error('No access_token in /token response');
-
-                localStorage.setItem('token', accessToken);
-                setToken(accessToken);
-              } catch (e) {
-                console.error('Login error:', e);
-                alert('Login failed. Check backend running on http://localhost:8000 and env.');
-              }
-            }}
-          >
-            Enter as Viewer
-          </button>
-        </div>
+          <h2 style={{ marginTop: 0 }}>{isLoginView ? 'Login' : 'Sign Up'}</h2>
+          <form onSubmit={isLoginView ? handleLogin : handleSignup}>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>Username</label>
+              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-color)' }} />
+            </div>
+            {!isLoginView && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>Email</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-color)' }} />
+              </div>
+            )}
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>Password</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-color)' }} />
+            </div>
+            <button type="submit" className="send-btn" style={{ width: '100%' }}>
+              {isLoginView ? 'Login' : 'Create Account'}
+            </button>
+          </form>
+          <p style={{ textAlign: 'center', fontSize: 14, marginTop: 20 }}>
+            {isLoginView ? "Don't have an account? " : "Already have an account? "}
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                setIsLoginView(!isLoginView);
+              }}
+              style={{ color: 'var(--secondary-color)', textDecoration: 'none', fontWeight: 500 }}
+            >
+              {isLoginView ? 'Sign Up' : 'Login'}
+            </a>
+          </p>
+        </form>
       </div>
     );
   }

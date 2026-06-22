@@ -5,10 +5,11 @@ import asyncio
 from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
-
+from pydantic import BaseModel, EmailStr
 from rag_multimodal.api.schemas import ChatRequest, ChatResponse, TokenResponse
-from rag_multimodal.auth_utils import RoleChecker, create_access_token
+from rag_multimodal.auth_utils import RoleChecker, create_access_token, verify_password, get_db, get_password_hash
 from rag_multimodal.ingest.embed_anything import EmbedAnythingClient
+from rag_multimodal.database import User as DBUser
 from rag_multimodal.ingest.quadrant_store import QuadrantStore
 from rag_multimodal.rag.gemini_client import GeminiClient
 from rag_multimodal.rag.prompt import build_gemini_prompt
@@ -60,6 +61,10 @@ store = QuadrantStore(
 # ---- Routes ----
 
 # Build chat routes (typed schemas + pydantic validation)
+class UserCreate(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
 chat_router = build_chat_routes(
     text_client=text_client,
     image_client=image_client,
@@ -70,16 +75,36 @@ app.include_router(chat_router)
 
 
 @app.post("/token", response_model=TokenResponse)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    # Mock verification for MVP (keep behavior identical to api_main.py)
-    if form_data.username not in ["admin_user", "staff_user"]:
-        # api_main.py used 400 Incorrect username or password
-        from fastapi import HTTPException
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db=Depends(get_db)):
+    from fastapi import HTTPException
 
+    user = db.query(DBUser).filter(DBUser.username == form_data.username).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+    
+    if not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect username or password")
 
-    access_token = create_access_token(data={"sub": form_data.username})
+    access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.post("/users/signup", status_code=status.HTTP_201_CREATED)
+async def signup(user: UserCreate, db=Depends(get_db)):
+    from rag_multimodal.database import Role
+    db_user = db.query(DBUser).filter(DBUser.username == user.username).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    
+    viewer_role = db.query(Role).filter(Role.name == "viewer").first()
+    if not viewer_role:
+        raise HTTPException(status_code=500, detail="Default 'viewer' role not found")
+
+    hashed_password = get_password_hash(user.password)
+    new_user = DBUser(username=user.username, email=user.email, hashed_password=hashed_password, roles=[viewer_role])
+    db.add(new_user)
+    db.commit()
+    return {"message": "User created successfully"}
 
 
 @app.post("/chat", response_model=ChatResponse)

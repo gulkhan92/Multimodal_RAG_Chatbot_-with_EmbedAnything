@@ -15,5 +15,7 @@ uvicorn
 python-jose
 passlib[bcrypt] # [bcrypt] is needed for the bcrypt scheme
 python-multipart
+sqlalchemy
+pydantic[email]
 python-docx
 qdrant-client
