@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, Depends
+import logging
+import asyncio
+from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -12,10 +14,29 @@ from rag_multimodal.rag.gemini_client import GeminiClient
 from rag_multimodal.rag.prompt import build_gemini_prompt
 from rag_multimodal.settings import Settings
 
+from rag_multimodal.api.logging_config import setup_logging
 from rag_multimodal.api.router import router as base_router
 from rag_multimodal.api.router import build_chat_routes
 
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            await connection.send_text(message)
+
+manager = ConnectionManager()
+
 app = FastAPI(title="Multimodal RAG API (refactored)")
+setup_logging(log_manager=manager)
 
 settings = Settings.from_env()
 
@@ -64,21 +85,28 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     # Keep core logic identical to api_main.py
+    logging.info(f"Received chat request: question='{request.question}'")
     q = request.question
 
+    logging.info("Embedding query for text search.")
     text_query_emb = text_client.embed_text([q])[0]
     store.collection = "data_pdf"
+    logging.info("Searching PDF collection.")
     text_chunks = store.similarity_search(embedding=text_query_emb, top_k=request.top_k)
     
     # Search generic text files (txt, md, docx)
     store.collection = "data_text"
+    logging.info("Searching text collection.")
     generic_text_chunks = store.similarity_search(embedding=text_query_emb, top_k=request.top_k)
     
+    logging.info("Embedding query for image search.")
     image_query_emb = image_client.embed_text([q])[0]
     store.collection = "data_png"
+    logging.info("Searching image collection.")
     image_chunks = store.similarity_search(embedding=image_query_emb, top_k=request.top_k)
 
-    all_chunks = sorted(text_chunks + image_chunks, key=lambda x: x.score, reverse=True)[: request.top_k]
+    all_chunks = sorted(text_chunks + generic_text_chunks + image_chunks, key=lambda x: x.score, reverse=True)[: request.top_k]
+    logging.info(f"Retrieved {len(all_chunks)} chunks for context.")
 
     prompt = build_gemini_prompt(question=q, chunks=all_chunks)
     
@@ -96,7 +124,9 @@ async def chat(request: ChatRequest):
                     contents.append(Image.open(p))
                     seen_images.add(img_path)
 
+    logging.info(f"Sending {len(contents)} parts to Gemini.")
     gemini_resp = gemini.generate(contents=contents)
+    logging.info("Received response from Gemini.")
 
     return {
         "answer": gemini_resp.text,
@@ -111,3 +141,13 @@ from rag_multimodal.auth_utils import RoleChecker
 async def sync_data(_=Depends(RoleChecker(["admin"]))):
     # Placeholder for triggering sync_vector_db logic (keep behavior identical)
     return {"message": "Sync triggered successfully"}
+
+
+@app.websocket("/ws/logs")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            await asyncio.sleep(60)  # Keep connection alive
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
