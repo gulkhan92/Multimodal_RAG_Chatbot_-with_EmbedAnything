@@ -1,16 +1,54 @@
 # Python
 __pycache__/
-*.pyc
-.venv*
-
-# Database
-*.db
-
-# Local sync manifest
-.rag_ingest_manifest.json
-
-# Data files
+*.py[cod]
+*.so
+*.egg-info/
+.venv/
+venv/
+.venv311/
+ENV/
+env/
 data/
+qdrant_data/
+qdrant_data.67660/
+qdrant_data.71297/
+qdrant_data.72346/
+qdrant_data.73617/
+qdrant_data.74503/
 
-# Qdrant local storage
-qdrant_data*
+
+# Virtual envs / tooling
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.ruff_cache/
+
+# Env files / secrets
+.env
+.env.*
+*.env
+.envrc
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Project data (do not ignore the corpus by default)
+# data/
+
+# Local ingest manifests (if you create/track them locally)
+.rag_ingest_manifest.json
+.rag_*manifest*.json
+
+# Build / dist
+build/
+dist/
+*.wheel
+*.tar.gz
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+.rag_ingest_manifest.json
