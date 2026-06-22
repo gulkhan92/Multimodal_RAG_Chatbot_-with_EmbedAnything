@@ -110,3 +110,8 @@ build/
 dist/
 *.egg
 *.whl
+
+# Local Qdrant directories
+qdrant_data*
+*.egg
+*.whl
