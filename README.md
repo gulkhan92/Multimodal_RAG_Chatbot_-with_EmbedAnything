@@ -87,6 +87,17 @@ Results are aggregated based on their similarity scores. High-scoring text chunk
 Images are retrieved from local storage and passed as raw bytes alongside the text prompt to Gemini, allowing the LLM to perform final cross-modal reasoning.
 
 
+## Authentication & Authorization
+The application uses a robust, database-driven Role-Based Access Control (RBAC) system.
+
+- **Authentication**: Handled via JWT (JSON Web Tokens). The `/token` endpoint validates user credentials against the database and issues a short-lived access token.
+- **Database**: Uses SQLite for simplicity and ease of setup, with SQLAlchemy as the ORM. The schema supports users, roles, and their relationships.
+- **Roles**:
+  - `admin`: Full access, including administrative endpoints like `/ingest/sync`.
+  - `viewer`: Standard user role, can access the chat functionality.
+- **Authorization**: Protected endpoints use a `RoleChecker` dependency in FastAPI to ensure the authenticated user has the required role to perform an action.
+- **User Management**: A default `admin` user is created via a database seeding script. New users can self-register through the UI and are assigned the `viewer` role by default.
+
 ## Technologies
 - **Language**: Python 3.11+
 - **Frontend**: React, TypeScript, Vite
@@ -105,8 +116,7 @@ Images are retrieved from local storage and passed as raw bytes alongside the te
 This project uses **Poetry** for dependency management.
 
 ```bash
-poetry install
-poetry shell
+pip install -r requirements.txt
 ```
 
 ### 2) Configure environment
